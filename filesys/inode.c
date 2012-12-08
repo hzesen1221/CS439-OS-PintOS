@@ -69,11 +69,11 @@ byte_to_sector (const struct inode *inode, off_t pos)
   ASSERT (inode != NULL);
   if (pos < inode->data.length){
     // case in which pos is within a direct index.
-    if(pos <= DLINKS * BLOCK_SECTOR_SIZE) {
+    if(pos < DLINKS * BLOCK_SECTOR_SIZE) {
       return inode->data.directs[pos / BLOCK_SECTOR_SIZE]; 
     }
     // case in which pos is within the single indirect index.
-    else if(pos <= (DLINKS + 128) * BLOCK_SECTOR_SIZE){
+    else if(pos < (DLINKS + 128) * BLOCK_SECTOR_SIZE){
       int newPos = pos - (DLINKS * BLOCK_SECTOR_SIZE);
       struct indirect_inode buff;
       block_read(fs_device, inode->data.indirect, &buff);
@@ -228,8 +228,8 @@ inode_create (block_sector_t sector, off_t length)
       int end = sectors - DLINKS - 1 < 128 ? sectors - DLINKS - 1 : 128;
       struct indirect_inode* indirect_disk_inode = NULL;
       if (end <= 0) {
-        free (disk_inode);
         block_write (fs_device, sector, disk_inode);
+        free (disk_inode);
         return true;
       }
       if (end > 0) {
@@ -258,6 +258,7 @@ inode_create (block_sector_t sector, off_t length)
         }
       }
       block_write (fs_device, disk_inode->indirect, indirect_disk_inode);
+      block_write (fs_device, sector, disk_inode); 
 
       if (sectors > DLINKS + 1 + 128) {
 
@@ -511,6 +512,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       /* Sector to write, starting byte offset within sector. */
       block_sector_t sector_idx = byte_to_sector (inode, offset);
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
+
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
       off_t inode_left = inode_length (inode) - offset;
       int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
