@@ -1,6 +1,5 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
-#include <string.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -12,36 +11,6 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "filesys/directory.h"
-
-
-int path_length(const char* path){
-  char* path_copy;
-  path_copy = palloc_get_page (0);
-  strlcpy (path_copy, path,512);
-  int result = 0;
-   char* s = path_copy;
-   char *token, *save_ptr;
-   for (token = strtok_r (s, "/", &save_ptr); token != NULL;
-        token = strtok_r (NULL, "/", &save_ptr))
-           result ++;
-   return result;
-}
-char* update_current_directory(const char* path){
-  int path_size = path_length(path);
-  char *path_array[path_size];
-  char *path_copy;
-  path_copy = palloc_get_page (0);
-  strlcpy (path_copy, path,512);
-  char *token, *save_ptr;
-  int index = 0;
-  for (token = strtok_r (path_copy, "/", &save_ptr); token != NULL;
-        token = strtok_r (NULL, "/", &save_ptr))
-           path_array[index++] = token;
-  int i;
-  //for(i = 0 )
-  if(path_array[0] == ".")
-    return NULL;
-}
 
 void halt (void){
   shutdown_power_off();
@@ -72,75 +41,19 @@ pid_t exec (const char *cmd_line){
 int wait (pid_t pid){
   return process_wait(pid);
 }
-bool chdir(const char *dir){
-
-}
-bool mkdir(const char *name){
-  if(name == NULL)
-    return false;
-  char* result;
-  if(name[0] == '.' || name[0] == '/')
-    result = update_current_directory(name);
-  else{
-    block_sector_t inode_sector = 0;
-    struct thread *cur = thread_current();
-    struct dir *dir;
-    if(cur->current_directory == NULL)
-      dir = dir_open_root ();
-    else
-      dir = dir_open_current();
-      bool success = (dir != NULL
-                    && free_map_allocate (1, &inode_sector)
-                    && dir_create (inode_sector, 50)
-                    && dir_add (dir, name, inode_sector));
-      if (!success && inode_sector != 0) 
-        free_map_release (inode_sector, 1);
-      dir_close (dir);
-
-    return success;
-  }
-}
-bool isdir(int fd){
-  struct thread* cur = thread_current();
-  struct file* file = cur->file_descriptors[fd];
-  struct inode* i = file_get_inode(file);
-  return get_isDir(i);
-}
-
-int inumber(int fd){
-  struct thread* cur = thread_current();
-  struct file *file = cur->file_descriptors[fd];
-  struct inode *i = file_get_inode(file);
-  return inode_get_inumber (i);
-}
 
 bool create (const char *file, unsigned initial_size){
-
-  char* result;
-  if(file[0] == '.' || file[0] == '/')
-    result = update_current_directory(file);
-  else
-    result = file;
-    return filesys_create(result, initial_size);
+//  if(file[0] == '/')
+//    return false;
+  return filesys_create(file, initial_size);
 }
 
 bool remove (const char *file){
-char* result;
-  if(file[0] == '.' || file[0] == '/')
-    result = update_current_directory(file);
-  else
-    result = file;
-    return filesys_remove(result);
+  return filesys_remove(file);
 }
 
 int open (const char *file){
-  struct file* f;
-  char* result;
-  if(file[0] == '.' || file[0] == '/')
-    result = update_current_directory(file);
-  else
-    result = file;
-  f = filesys_open(result);
+  struct file* f = filesys_open(file);
   if (!f) return -1;
   struct thread* cur = thread_current();
   int i = 2;
@@ -202,6 +115,48 @@ unsigned tell (int fd){
   struct thread* cur = thread_current();
   struct file *file = cur->file_descriptors[fd];
   return file_tell(file);
+}
+
+/** Subdirectory System Calls **/
+
+bool chdir(const char *dir){
+  if(dir == NULL || sizeof(dir) == 0)
+    return false;
+  //else if(dir[0] != '/')
+  //return filesys_create(dir, sizeof(dir));
+
+  //return true;
+  // dir_open(inode)  <<< HOW DO I GET INODE FROM char *dir???
+}
+
+bool mkdir(const char *dir){
+  if(dir == NULL || sizeof(dir) == 0)
+    return false;
+  //else if(dir[0] != '/')
+  return filesys_create(dir, 100);
+  //return dir_create(dir, 100);
+  //return true;
+}
+
+bool readdir(int fd, char *name){
+  //return dir_readdir(fd, name);
+  return true;
+}
+
+bool isdir(int fd){
+  struct thread* cur = thread_current();
+  struct file* file = cur->file_descriptors[fd];
+  struct inode* i = file_get_inode(file);
+  return get_isDir(i);
+}
+
+int inumber(int fd){
+  struct thread* cur = thread_current();
+  struct file* f = cur->file_descriptors[fd];
+  return inode_get_inumber(f->inode);
+//  block_sector_t num = f->inode->sector; /*error: request for member ‘sector’ in something not a structure or union*/
+//  return (int)(f->inode.sector);  /*error: request for member ‘sector’ in something not a structure or union*/
+  //return syscall1(SYS_INUMBER, fd);
 }
 
 
@@ -304,7 +259,7 @@ syscall_handler (struct intr_frame *f )
       f->eax = filesize(*arg_ptr);
       return; } 
       
-     case SYS_READ: { 
+    case SYS_READ: { 
       arg_ptr++;
       int fd = *arg_ptr;
       arg_ptr++;
@@ -355,8 +310,7 @@ syscall_handler (struct intr_frame *f )
         return; 
       }
       f->eax = tell(*arg_ptr);
-      return; }  
-
+      return; } 
 
     case SYS_CLOSE: {
       arg_ptr++;
@@ -368,42 +322,70 @@ syscall_handler (struct intr_frame *f )
       close(*arg_ptr);
       return; }
 
-    default: {
-      f->eax = -1;
-      exit(-1);
-      return; }
+    /* Subdirectory system calls */
 
-  case SYS_INUMBER: {
+    case SYS_CHDIR: {
       arg_ptr++;
-      if (!is_user_vaddr(arg_ptr) || *arg_ptr < 2 || *arg_ptr > 129) {
-        f->eax = -1;
-        exit(-1);
-        return; 
-      }
-      f->eax = inumber(*arg_ptr);
-      return; } 
-
-  case SYS_ISDIR: {
-      arg_ptr++;
-      if (!is_user_vaddr(arg_ptr) || *arg_ptr < 2 || *arg_ptr > 129) {
-        f->eax = -1;
-        exit(-1);
-        return; 
-      }
-      f->eax = isdir(*arg_ptr);
-      return; } 
-  
-  
-  case SYS_MKDIR: {
-      arg_ptr++;
-      if (!is_user_vaddr(arg_ptr) || *arg_ptr != NULL) {
+      if(arg_ptr == NULL){
         f->eax = -1;
         exit(-1);
         return;
       }
- 
-      else
-        return mkdir(*arg_ptr);}
+      chdir(*arg_ptr);
+      return;
+    }
+
+    case SYS_MKDIR: {
+      arg_ptr++;
+      if(arg_ptr == NULL){
+        f->eax = -1;
+        exit(-1);
+        return;
+      }
+      mkdir(*arg_ptr);
+      return;
+    }
+
+    case SYS_READDIR: {
+      arg_ptr++;
+      int fd = *arg_ptr;
+      arg_ptr++;
+      char name = *arg_ptr;
+      if(arg_ptr == NULL){
+        f->eax = -1;
+        exit(-1);
+        return;
+      }
+      readdir(fd, name);
+      return;
+    }
+
+    case SYS_ISDIR: {
+      arg_ptr++;
+      if(arg_ptr == NULL){
+        f->eax = -1;
+        exit(-1);
+        return;
+      }
+      isdir(*arg_ptr);
+      return;
+    }
+
+    case SYS_INUMBER: {
+      arg_ptr++;
+      if(arg_ptr == NULL){
+        f->eax = -1;
+        exit(-1);
+        return;
+      }
+      inumber(*arg_ptr);
+      return;
+    }
+
+    default: {
+      f->eax = -1;
+      exit(-1);
+      return; }
   }	
 }
 
