@@ -11,6 +11,7 @@
 #include "userprog/pagedir.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "filesys/directory.h"
 
 
 int path_length(const char* path){
@@ -72,16 +73,28 @@ int wait (pid_t pid){
 bool chdir(const char *dir){
 
 }
-bool mkdir(const char *dir){
+bool mkdir(const char *name){
   char* result;
-  if(dir[0] == '.' || dir[0] == '/')
-    result = update_current_directory(dir);
-  else
-    result = dir;
-    block_sector_t sector;
-    free_map_allocate (1, &sector);
-    return dir_create (sector, 25);
+  if(name[0] == '.' || name[0] == '/')
+    result = update_current_directory(name);
+  else{
+    block_sector_t inode_sector = 0;
+    struct thread *cur = thread_current();
+    struct dir *dir;
+    if(cur->current_directory == NULL)
+      dir = dir_open_root ();
+    else
+      dir = dir_open_current();
+      bool success = (dir != NULL
+                    && free_map_allocate (1, &inode_sector)
+                    && dir_create (inode_sector, 50)
+                    && dir_add (dir, name, inode_sector));
+      if (!success && inode_sector != 0) 
+        free_map_release (inode_sector, 1);
+      dir_close (dir);
 
+    return success;
+  }
 }
 bool isdir(int fd){
   struct thread* cur = thread_current();
@@ -376,6 +389,16 @@ syscall_handler (struct intr_frame *f )
       f->eax = isdir(*arg_ptr);
       return; } 
   
+  
+  case SYS_MKDIR: {
+      arg_ptr++;
+      if (!is_user_vaddr(arg_ptr) || *arg_ptr != NULL) {
+        f->eax = -1;
+        exit(-1);
+        return;
+      } 
+      else
+        return mkdir(*arg_ptr);}
   }	
 }
 
