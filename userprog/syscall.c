@@ -37,8 +37,10 @@ char* update_current_directory(const char* path){
   for (token = strtok_r (path_copy, "/", &save_ptr); token != NULL;
         token = strtok_r (NULL, "/", &save_ptr))
            path_array[index++] = token;
+  int i;
+  //for(i = 0 )
   if(path_array[0] == ".")
-    return path_array[1];
+    return NULL;
 }
 
 void halt (void){
@@ -74,6 +76,8 @@ bool chdir(const char *dir){
 
 }
 bool mkdir(const char *name){
+  if(name == NULL)
+    return false;
   char* result;
   if(name[0] == '.' || name[0] == '/')
     result = update_current_directory(name);
@@ -396,7 +400,8 @@ syscall_handler (struct intr_frame *f )
         f->eax = -1;
         exit(-1);
         return;
-      } 
+      }
+ 
       else
         return mkdir(*arg_ptr);}
   }	
