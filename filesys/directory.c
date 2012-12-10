@@ -55,14 +55,9 @@ dir_open (struct inode *inode)
 dir_open_current(void){
   struct thread* cur = thread_current();
   struct dir* directory = cur->current_directory;
-  if(directory != NULL){
-    struct inode* i = dir_get_inode(directory);
-    return dir_open(i);
-  }
-  else{
-    cur->current_directory = dir_open (inode_open (ROOT_DIR_SECTOR));
-    return cur->current_directory;
-  }
+  struct inode* i = dir_get_inode(directory);
+  return dir_open(i);
+  
 }
 /* Opens the root directory and returns a directory for it.
    Return true if successful, false on failure. */

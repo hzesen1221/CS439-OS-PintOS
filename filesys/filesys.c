@@ -6,6 +6,7 @@
 #include "filesys/free-map.h"
 #include "filesys/inode.h"
 #include "filesys/directory.h"
+#include "threads/thread.h"
 
 /* Partition that contains the file system. */
 struct block *fs_device;
@@ -46,7 +47,12 @@ bool
 filesys_create (const char *name, off_t initial_size) 
 {
   block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_current ();
+  struct thread *cur = thread_current();
+  struct dir *dir;
+  if(cur->current_directory == NULL)
+    dir = dir_open_root ();
+  else
+    dir = dir_open_current();
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size)
@@ -66,7 +72,12 @@ filesys_create (const char *name, off_t initial_size)
 struct file *
 filesys_open (const char *name)
 {
-  struct dir *dir = dir_open_current ();
+  struct thread *cur = thread_current();
+  struct dir *dir;
+  if(cur->current_directory == NULL)
+    dir = dir_open_root ();
+  else
+    dir = dir_open_current();
   struct inode *inode = NULL;
 
   if (dir != NULL)
@@ -83,7 +94,12 @@ filesys_open (const char *name)
 bool
 filesys_remove (const char *name) 
 {
-  struct dir *dir = dir_open_current ();
+  struct thread *cur = thread_current();
+  struct dir *dir;
+  if(cur->current_directory == NULL)
+    dir = dir_open_root ();
+  else
+    dir = dir_open_current();
   bool success = dir != NULL && dir_remove (dir, name);
   dir_close (dir); 
 
