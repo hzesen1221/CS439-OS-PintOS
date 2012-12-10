@@ -59,6 +59,7 @@ process_execute (const char *file_name)
   /* The following code ensures system function exec() works properly. */
   struct thread* user_thread = thread_get(tid);
   user_thread->parent_tid = thread_current()->tid;
+  user_thread->current_directory = thread_current()->current_directory;
   sema_down(&user_thread->utsema);
   if (user_thread->exit_status == LOAD_UNSUCCESSFUL) {
     palloc_free_page (real_file_name);

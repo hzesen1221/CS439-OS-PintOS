@@ -5,6 +5,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 /* A directory. */
 struct dir 
@@ -19,6 +20,7 @@ struct dir_entry
     block_sector_t inode_sector;        /* Sector number of header. */
     char name[NAME_MAX + 1];            /* Null terminated file name. */
     bool in_use;                        /* In use or free? */
+    char path[50][14];                  /* absolute path */
   };
 
 /* Creates a directory with space for ENTRY_CNT entries in the
@@ -49,6 +51,19 @@ dir_open (struct inode *inode)
     }
 }
 
+ struct dir *
+dir_open_current(void){
+  struct thread* cur = thread_current();
+  struct dir* directory = cur->current_directory;
+  if(directory != NULL){
+    struct inode* i = dir_get_inode(directory);
+    return dir_open(i);
+  }
+  else{
+    cur->current_directory = dir_open (inode_open (ROOT_DIR_SECTOR));
+    return cur->current_directory;
+  }
+}
 /* Opens the root directory and returns a directory for it.
    Return true if successful, false on failure. */
 struct dir *
@@ -82,6 +97,8 @@ dir_get_inode (struct dir *dir)
 {
   return dir->inode;
 }
+
+
 
 /* Searches DIR for a file with the given NAME.
    If successful, returns true, sets *EP to the directory entry

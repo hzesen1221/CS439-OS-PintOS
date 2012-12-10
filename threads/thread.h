@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "synch.h"
 #include "filesys/file.h"
+#include "filesys/directory.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -106,6 +107,7 @@ struct thread
     struct file* file_descriptors[130];
     struct tid_t* children[128];
     bool exit_called;
+    struct dir* current_directory;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
+#include <string.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -10,6 +11,34 @@
 #include "userprog/pagedir.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+
+
+int path_length(const char* path){
+  char* path_copy;
+  path_copy = palloc_get_page (0);
+  strlcpy (path_copy, path,512);
+  int result = 0;
+   char* s = path_copy;
+   char *token, *save_ptr;
+   for (token = strtok_r (s, "/", &save_ptr); token != NULL;
+        token = strtok_r (NULL, "/", &save_ptr))
+           result ++;
+   return result;
+}
+char* update_current_directory(const char* path){
+  int path_size = path_length(path);
+  char *path_array[path_size];
+  char *path_copy;
+  path_copy = palloc_get_page (0);
+  strlcpy (path_copy, path,512);
+  char *token, *save_ptr;
+  int index = 0;
+  for (token = strtok_r (path_copy, "/", &save_ptr); token != NULL;
+        token = strtok_r (NULL, "/", &save_ptr))
+           path_array[index++] = token;
+  if(path_array[0] == ".")
+    return path_array[1];
+}
 
 void halt (void){
   shutdown_power_off();
@@ -40,17 +69,61 @@ pid_t exec (const char *cmd_line){
 int wait (pid_t pid){
   return process_wait(pid);
 }
+bool chdir(const char *dir){
+
+}
+bool mkdir(const char *dir){
+  char* result;
+  if(dir[0] == '.' || dir[0] == '/')
+    result = update_current_directory(dir);
+  else
+    result = dir;
+    block_sector_t sector;
+    free_map_allocate (1, &sector);
+    return dir_create (sector, 25);
+
+}
+bool isdir(int fd){
+  struct thread* cur = thread_current();
+  struct file* file = cur->file_descriptors[fd];
+  struct inode* i = file_get_inode(file);
+  return get_isDir(i);
+}
+
+int inumber(int fd){
+  struct thread* cur = thread_current();
+  struct file *file = cur->file_descriptors[fd];
+  struct inode *i = file_get_inode(file);
+  return inode_get_inumber (i);
+}
 
 bool create (const char *file, unsigned initial_size){
-  return filesys_create(file, initial_size);
+
+  char* result;
+  if(file[0] == '.' || file[0] == '/')
+    result = update_current_directory(file);
+  else
+    result = file;
+    return filesys_create(result, initial_size);
 }
 
 bool remove (const char *file){
-  return filesys_remove(file);
+char* result;
+  if(file[0] == '.' || file[0] == '/')
+    result = update_current_directory(file);
+  else
+    result = file;
+    return filesys_remove(result);
 }
 
 int open (const char *file){
-  struct file* f = filesys_open(file);
+  struct file* f;
+  char* result;
+  if(file[0] == '.' || file[0] == '/')
+    result = update_current_directory(file);
+  else
+    result = file;
+  f = filesys_open(result);
   if (!f) return -1;
   struct thread* cur = thread_current();
   int i = 2;
@@ -214,7 +287,7 @@ syscall_handler (struct intr_frame *f )
       f->eax = filesize(*arg_ptr);
       return; } 
       
-    case SYS_READ: { 
+     case SYS_READ: { 
       arg_ptr++;
       int fd = *arg_ptr;
       arg_ptr++;
@@ -265,7 +338,7 @@ syscall_handler (struct intr_frame *f )
         return; 
       }
       f->eax = tell(*arg_ptr);
-      return; } 
+      return; }  
 
 
     case SYS_CLOSE: {
@@ -282,6 +355,27 @@ syscall_handler (struct intr_frame *f )
       f->eax = -1;
       exit(-1);
       return; }
+
+  case SYS_INUMBER: {
+      arg_ptr++;
+      if (!is_user_vaddr(arg_ptr) || *arg_ptr < 2 || *arg_ptr > 129) {
+        f->eax = -1;
+        exit(-1);
+        return; 
+      }
+      f->eax = inumber(*arg_ptr);
+      return; } 
+
+  case SYS_ISDIR: {
+      arg_ptr++;
+      if (!is_user_vaddr(arg_ptr) || *arg_ptr < 2 || *arg_ptr > 129) {
+        f->eax = -1;
+        exit(-1);
+        return; 
+      }
+      f->eax = isdir(*arg_ptr);
+      return; } 
+  
   }	
 }
 

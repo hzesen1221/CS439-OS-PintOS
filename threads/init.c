@@ -36,6 +36,7 @@
 #include "devices/ide.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
+#include "filesys/directory.h"
 #endif
 
 /* Page directory with kernel mappings only. */
@@ -125,8 +126,10 @@ main (void)
   ide_init ();
   locate_block_devices ();
   filesys_init (format_filesys);
-#endif
 
+#endif
+  struct thread* cur = thread_current();
+  cur->current_directory = NULL;
   printf ("Boot complete.\n");
   
   /* Run actions specified on kernel command line. */

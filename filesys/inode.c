@@ -6,7 +6,7 @@
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
-#define DLINKS 124
+#define DLINKS 123
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -31,6 +31,7 @@ struct inode_disk
     int directs[DLINKS];                /* Direct links. */
     int indirect;                       /* An indirect link. */
     int dindirect;                      /* A doubly-indirect link. */
+    int isDirectory;                    /* 0 if File, 1 if Directory */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -58,6 +59,11 @@ struct inode
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
   };
+int
+get_isDir (struct inode *inode) 
+{
+  return inode->data.isDirectory;
+}
 
 /* Returns the block device sector that contains byte offset POS
    within INODE.
