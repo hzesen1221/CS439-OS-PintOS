@@ -183,11 +183,9 @@ bool inode_process (block_sector_t sector, off_t length, struct inode_disk* arg_
           return;
         }
         block_read (fs_device, sector, disk_inode);
-        disk_inode->length = length; 
       }
 
       if (arg_disk_inode == NULL) {
-        disk_inode->length = length;
         disk_inode->magic = INODE_MAGIC;
         disk_inode->indirect = -1;
         disk_inode->dindirect = -1;
@@ -247,6 +245,7 @@ bool inode_process (block_sector_t sector, off_t length, struct inode_disk* arg_
       int end = sectors - DLINKS - 1 < 128 ? sectors - DLINKS - 1 : 128;
       struct indirect_inode* indirect_disk_inode = NULL;
       if (end <= 0) {
+        disk_inode->length = length;
         block_write (fs_device, sector, disk_inode);
         if (arg_disk_inode != NULL) {
           block_read (fs_device, sector, arg_disk_inode); 
@@ -281,7 +280,6 @@ bool inode_process (block_sector_t sector, off_t length, struct inode_disk* arg_
         }
       }
       block_write (fs_device, disk_inode->indirect, indirect_disk_inode);
-      block_write (fs_device, sector, disk_inode); 
       if (arg_disk_inode != NULL) {
         block_read (fs_device, sector, arg_disk_inode); 
       }
@@ -375,7 +373,7 @@ bool inode_process (block_sector_t sector, off_t length, struct inode_disk* arg_
         block_write (fs_device, disk_inode->dindirect, didi);
         free (didi);
       }
-
+      disk_inode->length = length;
       block_write (fs_device, sector, disk_inode); // update disk_inode on the disk.
       if (arg_disk_inode != NULL) {
         block_read (fs_device, sector, arg_disk_inode); 
@@ -402,8 +400,10 @@ inode_create (block_sector_t sector, off_t length, bool isDirectory)
 /* A function that grows the size of an inode. 
    It has no effect if the length of the inode is bigger than new_size. */
 void
-inode_grow (block_sector_t sector, off_t new_size, struct inode_disk* disk_inode) {
+inode_grow (block_sector_t sector, off_t new_size, struct inode_disk* disk_inode, struct lock* lock) {
+  lock_acquire(lock);
   inode_process (sector, new_size, disk_inode, disk_inode->isDirectory);
+  lock_release(lock);
 }
 
 /* Reads an inode from SECTOR
@@ -434,6 +434,7 @@ inode_open (block_sector_t sector)
 
   /* Initialize. */
   list_push_front (&open_inodes, &inode->elem);
+  lock_init(&inode->lock);
   inode->sector = sector;
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
@@ -566,7 +567,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   if (inode->deny_write_cnt)
     return 0;
 
-  inode_grow (inode->sector, offset + size, &inode->data);
+  inode_grow (inode->sector, offset + size, &inode->data, &inode->lock);
 
   while (size > 0) 
     {
